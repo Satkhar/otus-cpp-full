@@ -5,7 +5,20 @@ set(PROJECT_VESRION 0.0.${PATCH_VERSION})
 
 project(helloworld VERSION ${PROJECT_VESRION})
 
-option(WITH_BOOST_TEST "Whether to build Boost test" ON)
+option(WITH_TESTS "Whether to build tests" ON)  # Переименовано с WITH_BOOST_TEST
+
+# Подключаем Google Test через FetchContent
+if(WITH_TESTS)
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/release-1.12.1.tar.gz 
+    )
+    # ВАЖНО: Отключаем сборку ненужных компонентов
+    set(BUILD_GMOCK OFF CACHE BOOL "Disable gmock" FORCE)
+    set(INSTALL_GTEST OFF CACHE BOOL "Disable install" FORCE)
+    FetchContent_MakeAvailable(googletest)
+endif()
 
 configure_file(version.h.in version.h)
 
@@ -25,24 +38,38 @@ target_link_libraries(helloworld_cli PRIVATE
     helloworld
 )
 
-if(WITH_BOOST_TEST)
-    find_package(Boost COMPONENTS unit_test_framework REQUIRED)
+# if(WITH_TESTS)
+#     # Заменяем Boost.Test на Google Test
+#     find_package(GTest REQUIRED)
+    
+#     add_executable(test_version test_version.cpp)
+    
+#     set_target_properties(test_version PROPERTIES
+#         CXX_STANDARD 14
+#         CXX_STANDARD_REQUIRED ON
+#     )
+
+#     target_link_libraries(test_version
+#         GTest::GTest GTest::Main
+#         helloworld
+#     )
+# endif()
+
+
+
+# Настройка тестов
+if(WITH_TESTS)
     add_executable(test_version test_version.cpp)
-
-    set_target_properties(test_version PROPERTIES
-        CXX_STANDARD 14
-        CXX_STANDARD_REQUIRED ON
+    
+    target_link_libraries(test_version 
+        PRIVATE 
+            helloworld
+            GTest::gtest_main  # Используем встроенную main()
     )
-
-    set_target_properties(test_version PROPERTIES
-        COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK
-        INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIR}
-    )
-
-    target_link_libraries(test_version
-        ${Boost_LIBRARIES}
-        helloworld
-    )
+    
+    # Автоматическое обнаружение тестов
+    include(GoogleTest)
+    gtest_discover_tests(test_version)
 endif()
 
 if (MSVC)
@@ -52,7 +79,7 @@ if (MSVC)
     target_compile_options(helloworld PRIVATE
         /W4
     )
-    if(WITH_BOOST_TEST)
+    if(WITH_TESTS)
         target_compile_options(test_version PRIVATE
             /W4
         )
@@ -64,7 +91,7 @@ else ()
     target_compile_options(helloworld PRIVATE
         -Wall -Wextra -pedantic -Werror
     )
-    if(WITH_BOOST_TEST)
+    if(WITH_TESTS)
         target_compile_options(test_version PRIVATE
             -Wall -Wextra -pedantic -Werror
         )
@@ -80,7 +107,7 @@ set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
 set(CPACK_PACKAGE_CONTACT example@example.com)
 include(CPack)
 
-if(WITH_BOOST_TEST)
+if(WITH_TESTS)
     enable_testing()
-    add_test(test_version test_version)
+    add_test(NAME test_version COMMAND test_version)
 endif()
